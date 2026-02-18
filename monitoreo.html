@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Panel de Monitoreo</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{
+  font-family: Arial;
+  background:#1e1e2f;
+  color:white;
+  text-align:center;
+  margin:0;
+}
+
+h2{
+  font-size:32px;
+  margin:20px 0;
+}
+
+.container{
+  width:90%;
+  margin:auto;
+}
+
+canvas{
+  width:100% !important;
+  height:500px !important;
+  background:white;
+  border-radius:10px;
+  padding:10px;
+}
+
+.estado{
+  font-size:18px;
+  margin:10px;
+  font-weight:bold;
+}
+
+.alerta{ color:#ff4d4d; }
+.ok{ color:#4dff88; }
+
+table{
+  width:100%;
+  margin-top:30px;
+  border-collapse:collapse;
+  background:white;
+  color:black;
+}
+
+th, td{
+  padding:12px;
+  border:1px solid #ccc;
+}
+
+th{
+  background:#333;
+  color:white;
+}
+
+.oculto{
+  display:none;
+}
+
+.mensaje{
+  font-size:22px;
+  margin-top:100px;
+  color:#ffcc00;
+}
+
+</style>
+</head>
+<body>
+
+<h2>📊 PANEL DE MONITOREO DEL SERVIDOR</h2>
+
+<div id="mensajeInactivo" class="mensaje oculto">
+⚠ No hay servidores activos
+</div>
+
+<div id="panelMonitoreo" class="container oculto">
+
+  <canvas id="chart"></canvas>
+
+  <p id="estadoTemp" class="estado"></p>
+  <p id="estadoCPU" class="estado"></p>
+
+  <h3>Últimos 4 Registros</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Hora</th>
+        <th>CPU (%)</th>
+        <th>RAM (%)</th>
+        <th>Temperatura (°C)</th>
+        <th>Enfriamiento</th>
+      </tr>
+    </thead>
+    <tbody id="tablaRegistros"></tbody>
+  </table>
+
+</div>
+
+<script>
+
+const API = "https://69954d27b081bc23e9c2bc11.mockapi.io/api/v1/Devices"; // 🔴 PON TU URL
+
+let historial = [];
+let chart;
+let intervalo;
+
+// 🔎 Verifica si hay servidores activos
+async function verificarServidores(){
+
+  let res = await fetch(API);
+  let devices = await res.json();
+
+  let activos = devices.some(d => d.status === true);
+
+  if(activos){
+    document.getElementById("mensajeInactivo").classList.add("oculto");
+    document.getElementById("panelMonitoreo").classList.remove("oculto");
+
+    if(!chart){
+      iniciarGrafica();
+      update();
+      intervalo = setInterval(update,2000);
+    }
+
+  }else{
+    document.getElementById("panelMonitoreo").classList.add("oculto");
+    document.getElementById("mensajeInactivo").classList.remove("oculto");
+
+    if(intervalo){
+      clearInterval(intervalo);
+      intervalo = null;
+    }
+  }
+}
+
+function iniciarGrafica(){
+  chart = new Chart(document.getElementById("chart"),{
+    type:"line",
+    data:{
+      labels:[],
+      datasets:[
+        { label:"CPU", data:[], borderColor:"red", fill:false },
+        { label:"RAM", data:[], borderColor:"blue", fill:false },
+        { label:"Temperatura", data:[], borderColor:"orange", fill:false }
+      ]
+    },
+    options:{
+      responsive:true,
+      animation:false,
+      scales:{
+        y:{ min:0, max:100 }
+      }
+    }
+  });
+}
+
+function actualizarTabla(){
+
+  let tbody = document.getElementById("tablaRegistros");
+  tbody.innerHTML = "";
+
+  historial.slice(-4).reverse().forEach(reg=>{
+    tbody.innerHTML += `
+      <tr>
+        <td>${reg.hora}</td>
+        <td>${reg.cpu}</td>
+        <td>${reg.ram}</td>
+        <td>${reg.temp}</td>
+        <td>${reg.cool ? "Activado" : "Apagado"}</td>
+      </tr>
+    `;
+  });
+}
+
+async function update(){
+
+  try{
+
+    let res = await fetch(API);
+    let devices = await res.json();
+
+    if(devices.length < 4) return;
+
+    let cpu  = devices[0];
+    let ram  = devices[1];
+    let temp = devices[2];
+    let cool = devices[3];
+
+    cpu.value  = Math.floor(Math.random()*100);
+    ram.value  = Math.floor(Math.random()*100);
+    temp.value = Math.floor(Math.random()*100);
+
+    if(temp.value > 70){
+      cool.status = true;
+      document.getElementById("estadoTemp").innerHTML =
+        "⚠ Temperatura alta - Enfriamiento ACTIVADO";
+      document.getElementById("estadoTemp").className="estado alerta";
+    }else{
+      cool.status = false;
+      document.getElementById("estadoTemp").innerHTML =
+        "✔ Temperatura normal";
+      document.getElementById("estadoTemp").className="estado ok";
+    }
+
+    if(cpu.value > 85){
+      document.getElementById("estadoCPU").innerHTML =
+        "⚠ CPU en nivel crítico";
+      document.getElementById("estadoCPU").className="estado alerta";
+    }else{
+      document.getElementById("estadoCPU").innerHTML =
+        "✔ CPU estable";
+      document.getElementById("estadoCPU").className="estado ok";
+    }
+
+    let hora = new Date().toLocaleTimeString();
+
+    chart.data.labels.push(hora);
+    chart.data.datasets[0].data.push(cpu.value);
+    chart.data.datasets[1].data.push(ram.value);
+    chart.data.datasets[2].data.push(temp.value);
+
+    if(chart.data.labels.length > 10){
+      chart.data.labels.shift();
+      chart.data.datasets.forEach(d=>d.data.shift());
+    }
+
+    chart.update();
+
+    historial.push({
+      hora,
+      cpu: cpu.value,
+      ram: ram.value,
+      temp: temp.value,
+      cool: cool.status
+    });
+
+    actualizarTabla();
+
+    await fetch(API+"/"+cpu.id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(cpu)});
+    await fetch(API+"/"+ram.id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(ram)});
+    await fetch(API+"/"+temp.id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(temp)});
+    await fetch(API+"/"+cool.id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(cool)});
+
+  }catch(error){
+    console.log("Error:",error);
+  }
+
+}
+
+// 🔁 Verifica cada 2 segundos si hay servidores activos
+setInterval(verificarServidores,2000);
+verificarServidores();
+
+</script>
+
+</body>
+</html>

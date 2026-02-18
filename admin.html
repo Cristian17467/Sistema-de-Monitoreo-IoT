@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Administración</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+
+body{
+  background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  font-family: Arial;
+  color:white;
+}
+
+.navbar{
+  box-shadow:0 4px 10px rgba(0,0,0,0.4);
+}
+
+.titulo{
+  font-size:30px;
+  font-weight:bold;
+  margin-bottom:30px;
+}
+
+.card-form{
+  background:#1f2a40;
+  border:none;
+  border-radius:15px;
+  padding:25px;
+  box-shadow:0 8px 20px rgba(0,0,0,0.4);
+}
+
+.form-control, select{
+  border-radius:10px;
+}
+
+.btn-primary{
+  border-radius:10px;
+  font-weight:bold;
+  transition:0.3s;
+}
+
+.btn-primary:hover{
+  transform:scale(1.05);
+}
+
+.table{
+  background:white;
+  color:black;
+  border-radius:10px;
+  overflow:hidden;
+  box-shadow:0 8px 20px rgba(0,0,0,0.4);
+}
+
+.table thead{
+  background:#1f2a40;
+  color:white;
+}
+
+.estado-activo{
+  color:#28a745;
+  font-weight:bold;
+}
+
+.estado-inactivo{
+  color:#dc3545;
+  font-weight:bold;
+}
+
+.btn-warning{
+  border-radius:8px;
+}
+
+.btn-danger{
+  border-radius:8px;
+}
+
+</style>
+</head>
+
+<body>
+
+<nav class="navbar navbar-dark bg-dark">
+<div class="container-fluid">
+<a class="navbar-brand" href="index.html">🖥 Sistema TI</a>
+</div>
+</nav>
+
+<div class="container mt-5">
+
+<h3 class="titulo text-center">🛠 Administración de Servidores</h3>
+
+<div class="card-form mb-4">
+<form id="deviceForm" class="row g-3">
+<input type="hidden" id="deviceId">
+
+<div class="col-md-3">
+<input type="text" id="name" class="form-control" placeholder="Nombre del servidor" required>
+</div>
+
+<div class="col-md-3">
+<select id="type" class="form-control">
+<option value="servidor">Servidor</option>
+</select>
+</div>
+
+<div class="col-md-2">
+<input type="number" id="value" class="form-control" placeholder="Valor inicial" required>
+</div>
+
+<div class="col-md-2">
+<select id="status" class="form-control">
+<option value="true">Activo</option>
+<option value="false">Inactivo</option>
+</select>
+</div>
+
+<div class="col-md-2">
+<button class="btn btn-primary w-100">Guardar</button>
+</div>
+</form>
+</div>
+
+<table class="table table-bordered">
+<thead>
+<tr>
+<th>Nombre</th>
+<th>Tipo</th>
+<th>Valor</th>
+<th>Estado</th>
+<th>Acciones</th>
+</tr>
+</thead>
+<tbody id="deviceTable"></tbody>
+</table>
+
+</div>
+
+<script>
+
+const API = "https://69954d27b081bc23e9c2bc11.mockapi.io/api/v1/Devices";
+
+async function loadDevices() {
+    const res = await fetch(API);
+    const data = await res.json();
+    const table = document.getElementById("deviceTable");
+    table.innerHTML = "";
+
+    data.forEach(d => {
+        table.innerHTML += `
+        <tr>
+            <td>${d.name}</td>
+            <td>${d.type}</td>
+            <td>${d.value}</td>
+            <td class="${d.status ? 'estado-activo':'estado-inactivo'}">
+                ${d.status ? "Activo" : "Inactivo"}
+            </td>
+            <td>
+                <button class="btn btn-warning btn-sm"
+                    onclick="editDevice('${d.id}','${d.name}','${d.type}','${d.value}','${d.status}')">
+                    Editar
+                </button>
+                <button class="btn btn-danger btn-sm"
+                    onclick="deleteDevice('${d.id}')">
+                    Eliminar
+                </button>
+            </td>
+        </tr>`;
+    });
+}
+
+document.getElementById("deviceForm").addEventListener("submit", async function(e){
+    e.preventDefault();
+
+    const id = document.getElementById("deviceId").value;
+
+    const device = {
+        name: document.getElementById("name").value,
+        type: document.getElementById("type").value,
+        value: parseInt(document.getElementById("value").value),
+        status: document.getElementById("status").value === "true"
+    };
+
+    if(id){
+        await fetch(`${API}/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(device)
+        });
+    } else {
+        await fetch(API, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(device)
+        });
+    }
+
+    this.reset();
+    document.getElementById("deviceId").value = "";
+    loadDevices();
+});
+
+function editDevice(id,name,type,value,status){
+    document.getElementById("deviceId").value = id;
+    document.getElementById("name").value = name;
+    document.getElementById("type").value = type;
+    document.getElementById("value").value = value;
+    document.getElementById("status").value = status;
+}
+
+async function deleteDevice(id){
+    await fetch(`${API}/${id}`, { method: "DELETE" });
+    loadDevices();
+}
+
+loadDevices();
+
+</script>
+
+</body>
+</html>
