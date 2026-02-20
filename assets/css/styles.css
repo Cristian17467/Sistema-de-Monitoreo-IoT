@@ -1,0 +1,140 @@
+/* =========================
+   ESTILOS GENERALES
+========================= */
+
+body{
+  font-family: Arial, sans-serif;
+  margin:0;
+}
+
+/* =========================
+   INDEX
+========================= */
+
+body.index-page{
+  height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:white;
+  background: linear-gradient(-45deg,#0f2027,#203a43,#2c5364,#1e3c72);
+  background-size:400% 400%;
+  animation:gradientBG 12s ease infinite;
+}
+
+@keyframes gradientBG{
+  0%{background-position:0% 50%;}
+  50%{background-position:100% 50%;}
+  100%{background-position:0% 50%;}
+}
+
+.index-page h1{
+  font-size:42px;
+  font-weight:bold;
+  margin-bottom:50px;
+  text-shadow:0 5px 15px rgba(0,0,0,0.5);
+}
+
+.card{
+  border:none;
+  border-radius:20px;
+  padding:40px 20px;
+  background:rgba(255,255,255,0.1);
+  backdrop-filter:blur(15px);
+  color:white;
+  box-shadow:0 15px 35px rgba(0,0,0,0.5);
+  transition:0.4s;
+}
+
+.card:hover{
+  transform:translateY(-10px) scale(1.05);
+  box-shadow:0 20px 40px rgba(0,0,0,0.7);
+}
+
+.icon{
+  font-size:50px;
+  margin-bottom:20px;
+}
+
+.footer{
+  position:absolute;
+  bottom:20px;
+  font-size:14px;
+  opacity:0.8;
+}
+
+/* =========================
+   ADMIN
+========================= */
+
+body.admin-page{
+  background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  color:white;
+}
+
+.card-form{
+  background:#1f2a40;
+  border:none;
+  border-radius:15px;
+  padding:25px;
+  box-shadow:0 8px 20px rgba(0,0,0,0.4);
+}
+
+.estado-activo{ color:#28a745; font-weight:bold; }
+.estado-inactivo{ color:#dc3545; font-weight:bold; }
+
+/* =========================
+   CONTROL
+========================= */
+
+body.control-page{
+  background: linear-gradient(135deg,#141e30,#243b55);
+  color:white;
+}
+
+.switch-container{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-top:15px;
+}
+
+/* =========================
+   MONITOREO
+========================= */
+
+body.monitoreo-page{
+  background:#1e1e2f;
+  color:white;
+  text-align:center;
+}
+
+canvas{
+  width:100% !important;
+  height:500px !important;
+  background:white;
+  border-radius:10px;
+  padding:10px;
+}
+
+.alerta{ color:#ff4d4d; }
+.ok{ color:#4dff88; }
+.oculto{ display:none; }
+
+table{
+  width:100%;
+  margin-top:30px;
+  border-collapse:collapse;
+  background:white;
+  color:black;
+}
+
+th, td{
+  padding:12px;
+  border:1px solid #ccc;
+}
+
+th{
+  background:#333;
+  color:white;
+}

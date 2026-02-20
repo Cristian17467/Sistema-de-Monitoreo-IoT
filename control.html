@@ -2,132 +2,156 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Control</title>
+<title>Centro de Control - Sistema TI</title>
+
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
-
 body{
-  background: linear-gradient(135deg,#141e30,#243b55);
-  font-family: Arial;
-  color:white;
+background: linear-gradient(-45deg,#0f2027,#203a43,#2c5364,#000);
+background-size:400% 400%;
+animation:gradientBG 12s ease infinite;
+min-height:100vh;
+color:white;
 }
-
-.navbar{
-  box-shadow:0 4px 10px rgba(0,0,0,0.4);
+@keyframes gradientBG{
+0%{background-position:0% 50%;}
+50%{background-position:100% 50%;}
+100%{background-position:0% 50%;}
 }
-
-h3{
-  font-weight:bold;
-  margin-bottom:30px;
-  font-size:28px;
-}
-
 .card{
-  border:none;
-  border-radius:15px;
-  background:#1f2a40;
-  color:white;
-  box-shadow:0 8px 20px rgba(0,0,0,0.4);
-  transition:0.3s;
+background:rgba(255,255,255,0.08);
+border-radius:20px;
+padding:20px;
+margin-bottom:20px;
 }
-
-.card:hover{
-  transform:scale(1.03);
-  box-shadow:0 12px 25px rgba(0,0,0,0.6);
+.progress{height:18px;}
+.alerta{
+animation: parpadeo 1s infinite;
 }
-
-.card h5{
-  font-weight:bold;
-  font-size:20px;
+@keyframes parpadeo{
+0%{opacity:1;}
+50%{opacity:0.3;}
+100%{opacity:1;}
 }
-
-.valor{
-  font-size:16px;
-  opacity:0.8;
-}
-
-.estado-activo{
-  color:#4dff88;
-  font-weight:bold;
-}
-
-.estado-inactivo{
-  color:#ff4d4d;
-  font-weight:bold;
-}
-
-.form-check-input{
-  width:50px;
-  height:25px;
-}
-
-.switch-container{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-top:15px;
-}
-
 </style>
 </head>
 
 <body>
 
-<nav class="navbar navbar-dark bg-dark">
-<div class="container-fluid">
-<a class="navbar-brand" href="index.html">🖥 Sistema TI</a>
-</div>
-</nav>
-
 <div class="container mt-5">
-<h3 class="text-center">🎛 Panel de Control de Dispositivos (Servidores)</h3>
-<div id="controls" class="row"></div>
+<h2 class="text-center mb-4">🎛 Centro de Control General</h2>
+<div id="contenedor"></div>
 </div>
 
 <script>
 
-const API="https://69954d27b081bc23e9c2bc11.mockapi.io/api/v1/Devices";
+const API = "https://69980de6d66520f95f166acc.mockapi.io/api/v1/servidores";
 
-async function load(){
-const res=await fetch(API);
-const devices=await res.json();
-const container=document.getElementById("controls");
-container.innerHTML="";
-
-devices.forEach(d=>{
-container.innerHTML+=`
-<div class="col-md-4">
-  <div class="card p-4 mb-4">
-    <h5>${d.name}</h5>
-    <p class="valor">Valor actual: ${d.value}</p>
-
-    <div class="switch-container">
-      <span class="${d.status?'estado-activo':'estado-inactivo'}">
-        ${d.status?'Activo':'Inactivo'}
-      </span>
-
-      <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" ${d.status?'checked':''}
-        onchange="toggle(${d.id},this.checked)">
-      </div>
-    </div>
-
-  </div>
-</div>`;
-});
+/* 🔥 OBTENER SERVIDORES DESDE MOCKAPI */
+async function obtenerServidores(){
+    let res = await fetch(API);
+    return await res.json();
 }
 
-async function toggle(id,state){
-await fetch(`${API}/${id}`,{
-method:"PUT",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({status:state})
-});
-load();
+/* 🔥 CALCULAR ESTADO AUTOMÁTICO */
+function calcularEstado(carga, power){
+
+    if(power === false) return "Apagado";
+
+    if(carga >= 90) return "Crítico";
+    if(carga >= 70) return "Medio";
+    return "Estable";
 }
 
-load();
+/* 🔥 ENCENDER / APAGAR SERVIDOR */
+async function toggleServidor(id, actualPower){
+
+    let nuevoPower = !actualPower;
+    let nuevaCarga = nuevoPower ? 20 : 0;
+
+    let nuevoEstado = calcularEstado(nuevaCarga, nuevoPower);
+
+    await fetch(`${API}/${id}`,{
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            power:nuevoPower,
+            carga:nuevaCarga,
+            status:nuevoEstado
+        })
+    });
+
+    render();
+}
+
+/* 🔥 RENDER PRINCIPAL */
+async function render(){
+
+    const contenedor = document.getElementById("contenedor");
+    contenedor.innerHTML = "";
+
+    let servidores = await obtenerServidores();
+
+    if(servidores.length === 0){
+        contenedor.innerHTML = "<div class='alert alert-warning'>No hay datos.</div>";
+        return;
+    }
+
+    /* ORDENAR POR PISO */
+    servidores.sort((a,b)=> a.floor - b.floor);
+
+    servidores.forEach((s)=>{
+
+        let carga = parseInt(s.carga) || 0;
+        let power = s.power !== false; // si no existe lo toma como encendido
+        let estado = calcularEstado(carga, power);
+
+        let color = "bg-success";
+        let alerta = "";
+
+        if(!power){
+            color = "bg-secondary";
+        }
+        else if(carga >= 70 && carga < 90){
+            color = "bg-warning";
+        }
+        else if(carga >= 90){
+            color = "bg-danger";
+            alerta = "<div class='alert alert-danger alerta mt-2'>⚠ SERVIDOR EN ESTADO CRÍTICO</div>";
+        }
+
+        contenedor.innerHTML += `
+        <div class="card">
+            <h5>Servidor Piso ${s.floor} - ${s.name}</h5>
+            <p><strong>Piso:</strong> ${s.floor}</p>
+            <p><strong>Estado:</strong> ${estado}</p>
+            <p><strong>Carga:</strong> ${carga}%</p>
+
+            <div class="progress">
+                <div class="progress-bar ${color}" style="width:${carga}%">
+                    ${carga}%
+                </div>
+            </div>
+
+            ${alerta}
+
+            <button class="btn mt-3 ${power?"btn-danger":"btn-success"}"
+            onclick="toggleServidor('${s.id}', ${power})">
+            ${power?"Apagar":"Encender"}
+            </button>
+        </div>
+        `;
+    });
+}
+
+render();
+
+/* 🔥 ACTUALIZACIÓN AUTOMÁTICA CADA 3 SEGUNDOS */
+setInterval(render,3000);
 
 </script>
 

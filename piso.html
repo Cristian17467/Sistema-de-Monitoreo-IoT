@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Centro de Monitoreo</title>
+
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<style>
+body{
+    background: linear-gradient(135deg,#0f172a,#1e293b);
+    color:white;
+    font-family: 'Segoe UI', sans-serif;
+}
+.card{
+    background:#1e293b;
+    border:none;
+    border-radius:15px;
+    transition:0.3s;
+}
+.card:hover{
+    transform:scale(1.02);
+    box-shadow:0px 0px 20px rgba(0,255,255,0.2);
+}
+.progress{ height:22px; border-radius:10px; }
+.alerta{ animation: parpadeo 1s infinite; }
+@keyframes parpadeo{
+0%{opacity:1;}50%{opacity:0.3;}100%{opacity:1;}
+}
+.badge-estado{ font-size:0.8rem; padding:6px 10px; }
+</style>
+</head>
+
+<body class="container mt-5">
+
+<h2 class="text-center mb-4">
+🚀 Centro de Monitoreo - Piso <span id="tituloPiso"></span>
+</h2>
+
+<div class="text-end mb-3">
+<button class="btn btn-success" onclick="agregarServidor()">➕ Agregar Servidor</button>
+</div>
+
+<div id="contenedor" class="row g-4"></div>
+
+<!-- Toast -->
+<div class="position-fixed bottom-0 end-0 p-3">
+<div id="toastAlerta" class="toast text-bg-danger border-0">
+<div class="d-flex">
+<div class="toast-body">⚠ Servidor en estado CRÍTICO</div>
+<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+</div>
+</div>
+</div>
+
+<script>
+
+const API = "https://69980de6d66520f95f166acc.mockapi.io/api/v1/servidores";
+const params = new URLSearchParams(window.location.search);
+const piso = parseInt(params.get("piso")) || 1;
+document.getElementById("tituloPiso").innerText = piso;
+
+/* 🔥 OBTENER SERVIDORES */
+async function obtenerServidores(){
+let res = await fetch(API);
+let data = await res.json();
+return data.filter(s => String(s.floor) === String(piso));
+}
+
+/* 🔥 AGREGAR SERVIDOR */
+async function agregarServidor(){
+
+let nombre = `SRV-P${piso}-${Math.floor(Math.random()*1000)}`;
+
+await fetch(API,{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+name:nombre,
+floor:piso,
+carga:20,
+status:"Estable",
+power:true
+})
+});
+
+render();
+}
+
+/* 🔥 ELIMINAR SERVIDOR */
+async function eliminarServidor(id){
+await fetch(`${API}/${id}`,{ method:"DELETE" });
+render();
+}
+
+/* 🔥 CALCULAR ESTADO */
+function calcularEstado(carga){
+if(carga >= 90) return "Crítico";
+if(carga >= 70) return "Medio";
+return "Estable";
+}
+
+/* 🔥 SIMULACIÓN AUTOMÁTICA */
+async function simularCarga(s){
+
+if(s.power === false) return;
+
+let cargaActual = parseInt(s.carga) || 0;
+
+/* 🔥 PROVOCAR UNA ANOMALÍA DEMOSTRATIVA */
+if(Math.random() < 0.08){
+cargaActual = 95; // fuerza estado crítico
+}else{
+cargaActual += Math.floor(Math.random()*15)-5;
+}
+
+if(cargaActual < 0) cargaActual = 0;
+if(cargaActual > 100) cargaActual = 100;
+
+let nuevoEstado = calcularEstado(cargaActual);
+
+if(nuevoEstado === "Crítico"){
+mostrarAlerta();
+}
+
+await fetch(`${API}/${s.id}`,{
+method:"PUT",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+carga:cargaActual,
+status:nuevoEstado
+})
+});
+}
+
+/* 🔥 TOAST */
+function mostrarAlerta(){
+const toast = new bootstrap.Toast(document.getElementById('toastAlerta'));
+toast.show();
+}
+
+/* 🔥 RENDER */
+async function render(){
+
+const contenedor = document.getElementById("contenedor");
+contenedor.innerHTML="";
+
+let servidores = await obtenerServidores();
+
+if(servidores.length === 0){
+contenedor.innerHTML = `
+<div class="alert alert-warning text-center">
+No hay servidores en este piso
+</div>`;
+return;
+}
+
+for(let s of servidores){
+
+await simularCarga(s);
+
+let carga = parseInt(s.carga) || 0;
+let estado = calcularEstado(carga);
+
+let color =
+carga>=90?"bg-danger":
+carga>=70?"bg-warning":
+"bg-success";
+
+let badge =
+carga>=90?`<span class="badge bg-danger badge-estado">Crítico</span>`:
+carga>=70?`<span class="badge bg-warning text-dark badge-estado">Medio</span>`:
+`<span class="badge bg-success badge-estado">Estable</span>`;
+
+let alerta = carga>=90?`
+<div class="alert alert-danger alerta mt-3">
+⚠ ANOMALÍA DETECTADA - APAGAR DESDE CONTROL
+</div>`:"";
+
+let apagado = s.power===false?`
+<div class="alert alert-secondary mt-3">
+🔴 SERVIDOR APAGADO
+</div>`:"";
+
+contenedor.innerHTML += `
+<div class="col-md-6">
+<div class="card p-4 shadow-lg">
+
+<div class="d-flex justify-content-between align-items-center">
+<h5>${s.name}</h5>
+${badge}
+</div>
+
+<p class="text-muted">ID: ${s.id}</p>
+<p><strong>Estado:</strong> ${estado}</p>
+
+<div class="progress mb-3">
+<div class="progress-bar ${color}" style="width:${carga}%">
+${carga}%
+</div>
+</div>
+
+${alerta}
+${apagado}
+
+<div class="d-flex gap-2">
+<button onclick="eliminarServidor('${s.id}')" 
+class="btn btn-danger w-50">
+🗑 Eliminar
+</button>
+</div>
+
+</div>
+</div>
+`;
+}
+}
+
+render();
+setInterval(render,4000);
+
+</script>
+
+</body>
+</html>

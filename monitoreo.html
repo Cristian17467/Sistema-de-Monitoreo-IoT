@@ -3,259 +3,239 @@
 <head>
 <meta charset="UTF-8">
 <title>Panel de Monitoreo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="icon" type="image/png" href="assets/img/favicon.png">
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
 body{
-  font-family: Arial;
-  background:#1e1e2f;
-  color:white;
-  text-align:center;
-  margin:0;
+margin:0;
+font-family:'Segoe UI', sans-serif;
+background: linear-gradient(-45deg,#0f2027,#1c1c2b,#2c5364,#000000);
+background-size:400% 400%;
+animation:gradientBG 15s ease infinite;
+color:white;
+min-height:100vh;
+}
+
+@keyframes gradientBG{
+0%{background-position:0% 50%;}
+50%{background-position:100% 50%;}
+100%{background-position:0% 50%;}
 }
 
 h2{
-  font-size:32px;
-  margin:20px 0;
+text-align:center;
+padding:30px;
+font-weight:bold;
+letter-spacing:2px;
 }
 
-.container{
-  width:90%;
-  margin:auto;
+.container-panel{
+padding:20px 40px 60px 40px;
+}
+
+.floor-title{
+margin-top:40px;
+margin-bottom:20px;
+border-left:6px solid #00d4ff;
+padding-left:15px;
+font-weight:bold;
+}
+
+.server-card{
+background:rgba(255,255,255,0.08);
+backdrop-filter:blur(20px);
+border-radius:20px;
+padding:20px;
+height:100%;
+box-shadow:0 10px 30px rgba(0,0,0,0.5);
+transition:0.4s;
+position:relative;
+}
+
+.server-card:hover{
+transform:translateY(-6px);
+}
+
+.alerta{
+animation: parpadeo 1s infinite;
+}
+
+@keyframes parpadeo{
+0%{opacity:1;}
+50%{opacity:0.3;}
+100%{opacity:1;}
+}
+
+.apagado{
+background:rgba(255,0,0,0.15);
+text-align:center;
+padding:40px;
+border-radius:15px;
+font-weight:bold;
 }
 
 canvas{
-  width:100% !important;
-  height:500px !important;
-  background:white;
-  border-radius:10px;
-  padding:10px;
+margin-top:15px;
 }
-
-.estado{
-  font-size:18px;
-  margin:10px;
-  font-weight:bold;
-}
-
-.alerta{ color:#ff4d4d; }
-.ok{ color:#4dff88; }
-
-table{
-  width:100%;
-  margin-top:30px;
-  border-collapse:collapse;
-  background:white;
-  color:black;
-}
-
-th, td{
-  padding:12px;
-  border:1px solid #ccc;
-}
-
-th{
-  background:#333;
-  color:white;
-}
-
-.oculto{
-  display:none;
-}
-
-.mensaje{
-  font-size:22px;
-  margin-top:100px;
-  color:#ffcc00;
-}
-
 </style>
 </head>
+
 <body>
 
-<h2>📊 PANEL DE MONITOREO DEL SERVIDOR</h2>
+<h2>📊 PANEL DE MONITOREO EN TIEMPO REAL</h2>
 
-<div id="mensajeInactivo" class="mensaje oculto">
-⚠ No hay servidores activos
-</div>
-
-<div id="panelMonitoreo" class="container oculto">
-
-  <canvas id="chart"></canvas>
-
-  <p id="estadoTemp" class="estado"></p>
-  <p id="estadoCPU" class="estado"></p>
-
-  <h3>Últimos 4 Registros</h3>
-  <table>
-    <thead>
-      <tr>
-        <th>Hora</th>
-        <th>CPU (%)</th>
-        <th>RAM (%)</th>
-        <th>Temperatura (°C)</th>
-        <th>Enfriamiento</th>
-      </tr>
-    </thead>
-    <tbody id="tablaRegistros"></tbody>
-  </table>
-
-</div>
+<div id="panelMonitoreo" class="container-panel container-fluid"></div>
 
 <script>
 
-const API = "https://69954d27b081bc23e9c2bc11.mockapi.io/api/v1/Devices"; // 🔴 PON TU URL
+const API = "https://69980de6d66520f95f166acc.mockapi.io/api/v1/servidores";
 
-let historial = [];
-let chart;
-let intervalo;
-
-// 🔎 Verifica si hay servidores activos
-async function verificarServidores(){
-
-  let res = await fetch(API);
-  let devices = await res.json();
-
-  let activos = devices.some(d => d.status === true);
-
-  if(activos){
-    document.getElementById("mensajeInactivo").classList.add("oculto");
-    document.getElementById("panelMonitoreo").classList.remove("oculto");
-
-    if(!chart){
-      iniciarGrafica();
-      update();
-      intervalo = setInterval(update,2000);
-    }
-
-  }else{
-    document.getElementById("panelMonitoreo").classList.add("oculto");
-    document.getElementById("mensajeInactivo").classList.remove("oculto");
-
-    if(intervalo){
-      clearInterval(intervalo);
-      intervalo = null;
-    }
-  }
-}
-
-function iniciarGrafica(){
-  chart = new Chart(document.getElementById("chart"),{
-    type:"line",
-    data:{
-      labels:[],
-      datasets:[
-        { label:"CPU", data:[], borderColor:"red", fill:false },
-        { label:"RAM", data:[], borderColor:"blue", fill:false },
-        { label:"Temperatura", data:[], borderColor:"orange", fill:false }
-      ]
-    },
-    options:{
-      responsive:true,
-      animation:false,
-      scales:{
-        y:{ min:0, max:100 }
-      }
-    }
-  });
-}
-
-function actualizarTabla(){
-
-  let tbody = document.getElementById("tablaRegistros");
-  tbody.innerHTML = "";
-
-  historial.slice(-4).reverse().forEach(reg=>{
-    tbody.innerHTML += `
-      <tr>
-        <td>${reg.hora}</td>
-        <td>${reg.cpu}</td>
-        <td>${reg.ram}</td>
-        <td>${reg.temp}</td>
-        <td>${reg.cool ? "Activado" : "Apagado"}</td>
-      </tr>
-    `;
-  });
-}
-
-async function update(){
-
-  try{
-
+/* 🔥 OBTENER DATOS DESDE MOCKAPI */
+async function obtenerServidores(){
     let res = await fetch(API);
-    let devices = await res.json();
+    return await res.json();
+}
 
-    if(devices.length < 4) return;
+/* 🔥 CALCULAR ESTADO */
+function calcularEstado(carga, power){
+    if(power === false) return "Apagado";
+    if(carga >= 90) return "Crítico";
+    if(carga >= 70) return "Medio";
+    return "Estable";
+}
 
-    let cpu  = devices[0];
-    let ram  = devices[1];
-    let temp = devices[2];
-    let cool = devices[3];
-
-    cpu.value  = Math.floor(Math.random()*100);
-    ram.value  = Math.floor(Math.random()*100);
-    temp.value = Math.floor(Math.random()*100);
-
-    if(temp.value > 70){
-      cool.status = true;
-      document.getElementById("estadoTemp").innerHTML =
-        "⚠ Temperatura alta - Enfriamiento ACTIVADO";
-      document.getElementById("estadoTemp").className="estado alerta";
-    }else{
-      cool.status = false;
-      document.getElementById("estadoTemp").innerHTML =
-        "✔ Temperatura normal";
-      document.getElementById("estadoTemp").className="estado ok";
-    }
-
-    if(cpu.value > 85){
-      document.getElementById("estadoCPU").innerHTML =
-        "⚠ CPU en nivel crítico";
-      document.getElementById("estadoCPU").className="estado alerta";
-    }else{
-      document.getElementById("estadoCPU").innerHTML =
-        "✔ CPU estable";
-      document.getElementById("estadoCPU").className="estado ok";
-    }
-
-    let hora = new Date().toLocaleTimeString();
-
-    chart.data.labels.push(hora);
-    chart.data.datasets[0].data.push(cpu.value);
-    chart.data.datasets[1].data.push(ram.value);
-    chart.data.datasets[2].data.push(temp.value);
-
-    if(chart.data.labels.length > 10){
-      chart.data.labels.shift();
-      chart.data.datasets.forEach(d=>d.data.shift());
-    }
-
-    chart.update();
-
-    historial.push({
-      hora,
-      cpu: cpu.value,
-      ram: ram.value,
-      temp: temp.value,
-      cool: cool.status
+/* 🔥 AGRUPAR POR PISO */
+function agruparPorPiso(data){
+    const pisos = {};
+    data.forEach(s=>{
+        if(!pisos[s.floor]) pisos[s.floor]=[];
+        pisos[s.floor].push(s);
     });
+    return pisos;
+}
 
-    actualizarTabla();
+/* 🔥 RENDER PRINCIPAL */
+async function renderMonitoreo(){
 
-    await fetch(API+"/"+cpu.id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(cpu)});
-    await fetch(API+"/"+ram.id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(ram)});
-    await fetch(API+"/"+temp.id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(temp)});
-    await fetch(API+"/"+cool.id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(cool)});
+const panel=document.getElementById("panelMonitoreo");
+panel.innerHTML="";
 
-  }catch(error){
-    console.log("Error:",error);
-  }
+let servidores = await obtenerServidores();
+if(servidores.length===0){
+panel.innerHTML="<div class='alert alert-warning'>No hay servidores registrados</div>";
+return;
+}
+
+const pisos=agruparPorPiso(servidores);
+
+Object.keys(pisos).sort((a,b)=>a-b).forEach(piso=>{
+
+panel.innerHTML+=`
+<h4 class="floor-title">🏢 Piso ${piso}</h4>
+<div class="row" id="piso-${piso}"></div>
+`;
+
+const fila=document.getElementById(`piso-${piso}`);
+
+pisos[piso].forEach((servidor,index)=>{
+
+let carga=parseInt(servidor.carga)||0;
+let power=servidor.power!==false;
+let estado=calcularEstado(carga,power);
+
+if(!power){
+
+fila.innerHTML+=`
+<div class="col-md-3 mb-4">
+<div class="server-card apagado">
+<h5>${servidor.name}</h5>
+<p>🔴 SERVIDOR APAGADO</p>
+</div>
+</div>
+`;
+
+}else{
+
+let colorBarra=
+carga>=90?"bg-danger":
+carga>=70?"bg-warning":
+"bg-success";
+
+let alerta=carga>=90?
+"<div class='alert alert-danger alerta mt-2'>⚠ ANOMALÍA CRÍTICA - APAGAR DESDE CONTROL</div>"
+:"";
+
+fila.innerHTML+=`
+<div class="col-md-3 mb-4">
+<div class="server-card">
+
+<h5>${servidor.name}</h5>
+
+<p><strong>Estado:</strong> ${estado}</p>
+<p><strong>Carga:</strong> ${carga}%</p>
+
+<div class="progress mb-2">
+<div class="progress-bar ${colorBarra}"
+style="width:${carga}%">
+${carga}%
+</div>
+</div>
+
+${alerta}
+
+<canvas id="chart-${piso}-${index}" height="120"></canvas>
+
+</div>
+</div>
+`;
+
+setTimeout(()=>{
+crearGrafica(`chart-${piso}-${index}`,carga);
+},100);
 
 }
 
-// 🔁 Verifica cada 2 segundos si hay servidores activos
-setInterval(verificarServidores,2000);
-verificarServidores();
+});
+
+});
+
+}
+
+/* 🔥 GRÁFICA DONUT */
+function crearGrafica(id,valor){
+
+const ctx=document.getElementById(id);
+
+new Chart(ctx,{
+type:'doughnut',
+data:{
+labels:["Uso","Libre"],
+datasets:[{
+data:[valor,100-valor],
+backgroundColor:[
+valor>=90?"#ff4d4d":
+valor>=70?"#ffc107":
+"#00ff88",
+"#1c1c2b"
+],
+borderWidth:0
+}]
+},
+options:{
+plugins:{legend:{display:false}},
+cutout:"70%"
+}
+});
+
+}
+
+renderMonitoreo();
+setInterval(renderMonitoreo,3000);
 
 </script>
 
